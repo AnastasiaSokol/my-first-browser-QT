@@ -1,0 +1,285 @@
+//MAIN DIALOG IF OUR BRAUSER
+#include "widget.h"//файл в директории проекта
+#include "mydialog.h"
+#include "histordialog.h"
+
+#ifdef Q_OS_WIN32
+    #define _WIN32_IE 0x0400
+    #include <shlobj.h>
+    #undef _WIN32_IE
+#endif
+//файл реализации
+Widget::Widget(QWidget *parent)//реализация конструтора
+    : QWidget(parent)
+{
+    //----------------------------------------------------------------------------------
+    //QStackedWidget
+    QPushButton *firstPageWidget  = new QPushButton(tr("first"));
+    QPushButton *secondPageWidget = new QPushButton(tr("second"));
+    QPushButton *thirdPageWidget  = new QPushButton(tr("treath"));
+
+    QTabWidget *stackedWidget     = new QTabWidget;
+
+    stackedWidget->addTab(firstPageWidget,"1");
+    stackedWidget->addTab(secondPageWidget,"2");
+    stackedWidget->addTab(thirdPageWidget,"+");
+    stackedWidget->setTabIcon(0,QIcon("icon.png"));
+    //----------------------------------------------------------------------------------
+    adresstr        = new QLineEdit();
+    //кнопки управления
+    prevbutton1     = new MyButton(tr("<<"));
+    nextbutton2     = new MyButton(tr(">>"));
+    stopbutton3     = new MyButton(tr("stop"));
+    refreshbutton4  = new MyButton(tr("refresh"));
+    gobutton5       = new MyButton(tr("go"));
+    //страница отображения
+    webView           = new QWebView();
+    //создадим меню
+    menuBar           = new QMenuBar();
+    mainMenu          = new MyMenu(tr("Menu"));
+    settingsAction    = new QAction(tr("Settings"),this);
+    closeAction       = new QAction(tr("Close"),this);
+    historyAction       = new QAction(tr("History"),this);
+    //Для масштабирования
+    spinboxScale      = new QSpinBox;//счетчик
+    sliderScale       = new QSlider(Qt::Horizontal);  //горизонтальный бегунок
+    labelScale        = new QLabel(tr("<h3><i>Масштаб</i></h3>"));
+    //компоновщик layout -расскладывает на формочке ГЭ. gridlayot - в виде таблицы
+    mainlay1          = new QVBoxLayout();
+    innerlay1         = new QVBoxLayout();
+    toolbarlay2       = new QHBoxLayout();//Horisontal
+    layScale          = new QHBoxLayout();
+    label1            = new QLabel("");
+    //----------------------------------------------------------------------------------
+    //Settings
+    setWindowTitle(tr("My brauser"));
+    this->setWindowIcon(QIcon("icon.png"));
+    //кнопки их доступность
+    prevbutton1     ->setEnabled(false);
+    nextbutton2     ->setEnabled(false);
+    stopbutton3     ->setEnabled(false);
+    refreshbutton4  ->setEnabled(false);
+    //всплывающие подсказки
+    prevbutton1     ->setToolTip(tr("Нажмите, чтобы вернуться  назад"));
+    nextbutton2     ->setToolTip(tr("Нажмите, чтобы перейти вперед"));
+    stopbutton3     ->setToolTip(tr("Нажмите, чтобы остановить загрузку страницы"));
+    refreshbutton4  ->setToolTip(tr("Нажмите, чтобы обновить страницу"));
+    spinboxScale    ->setToolTip(tr("Передвигая ползунок, изменяйте маштаб страницы"));
+    gobutton5       ->setToolTip(tr("Нажмите, чтобы перейти по URL"));
+    settingsAction  ->setToolTip(tr("Изменение настроек прокси"));
+    closeAction     ->setToolTip(tr("Закрыть браузер"));
+    //установка элементов масштабирования
+    spinboxScale    ->setRange(1,200);   //допустимый диапазон изменений ползунка
+    spinboxScale    ->setValue(100);
+    spinboxScale    ->setSingleStep(1);
+    sliderScale     ->setRange(1,200);    //допустимый диапазон изменений счетчика
+    sliderScale     ->setValue(100);
+    //устанавливаем политику масштабирования
+    menuBar         ->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);//по горизонтально расширяем максимального, по вертикали ограничиваем Expanding
+    menuBar         ->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);//по горизонтально расширяем максимального, по вертикали ограничиваем Expanding
+    webView         ->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);//по горизонтально расширяем максимального, по вертикали ограничиваем Expanding
+    //загрузка страницы
+    webView         ->load(QUrl("http://txt.newsru.com"));
+    webView         ->page()->setLinkDelegationPolicy(QWebPage::DelegateAllLinks);//передача по ссылкам
+    //установки для компановщиков
+    innerlay1       ->setContentsMargins(5,0,5,5);//поля внутри компановщика
+    mainlay1        ->setMargin(0);//отступы аналог setContentsMargins(0,0,0,0);
+    setLayout(mainlay1);//устанавливает компоновщик
+    //----------------------------------------------------------------------------------
+    //Коструирование интерфейса
+    toolbarlay2->addWidget(prevbutton1);
+    toolbarlay2->addWidget(nextbutton2);
+    toolbarlay2->addWidget(stopbutton3);
+    toolbarlay2->addWidget(refreshbutton4);
+    toolbarlay2->addWidget(adresstr);
+    toolbarlay2->addWidget(gobutton5);
+
+    mainMenu    ->addAction(historyAction);
+    mainMenu    ->addAction(settingsAction);
+    mainMenu    ->addAction(closeAction);
+    menuBar     ->addMenu(mainMenu);
+
+    innerlay1   ->addLayout(toolbarlay2);
+    innerlay1   ->addWidget(stackedWidget);
+    innerlay1   ->addWidget(webView);
+    innerlay1   ->addWidget(label1);
+
+    //контруирование элементов для масштабирования
+    layScale    ->addWidget(labelScale);
+    layScale    ->addWidget(spinboxScale);
+    layScale    ->addWidget(sliderScale);
+    layScale    ->addStretch(2);
+
+    mainlay1    ->addWidget(menuBar);
+    mainlay1    ->addLayout(toolbarlay2);
+    mainlay1    ->addLayout(innerlay1);
+    mainlay1    ->addLayout(layScale);
+    //----------------------------------------------------------------------------------
+    connect(adresstr,       SIGNAL(returnPressed()),    this,   SLOT(goURL()));
+
+    connect(gobutton5,      SIGNAL(clicked(bool)),      this,   SLOT(goURL()));
+    connect(prevbutton1,    SIGNAL(clicked(bool)),      this,   SLOT(PrevButtonclicked()));
+    connect(nextbutton2,    SIGNAL(clicked(bool)),      this,   SLOT(NextButtonclicked()));
+    connect(refreshbutton4, SIGNAL(clicked(bool)),      this,   SLOT(RefreshButtonclicked()));
+    connect(stopbutton3,    SIGNAL(clicked(bool)),      this,   SLOT(StopButtonclicked()));
+
+    connect(webView,        SIGNAL(linkClicked(QUrl)),      this,   SLOT(pageLinkClicked(QUrl)));
+    connect(webView,        SIGNAL(titleChanged(QString)),  this,   SLOT(pageTitleChanged(QString)));
+    connect(webView,        SIGNAL(urlChanged(QUrl)),       this,   SLOT(pageUrlChanged(QUrl)));
+
+    connect(webView,        SIGNAL(loadStarted()),          this,   SLOT(pageLoadStarted()));
+    connect(webView,        SIGNAL(loadFinished(bool)),     this,   SLOT(pageLoadFinished()));
+
+    connect(closeAction,    SIGNAL(triggered(bool)),        this,   SLOT(closeClicked()));
+    connect(settingsAction, SIGNAL(triggered(bool)),        this,   SLOT(settingsClicked()));
+    connect(historyAction,  SIGNAL(triggered(bool)),        this,   SLOT(historyClicked()));
+    //синхонизация работы счетчика и ползунка:заставим счетчик и ползунок показывать одинаковые значения
+    connect(spinboxScale, SIGNAL(valueChanged(int)),sliderScale, SLOT(setValue(int)));
+    connect(spinboxScale, SIGNAL(valueChanged(int)),this, SLOT(changePageScale(int)));
+    connect(sliderScale,  SIGNAL(valueChanged(int)),spinboxScale,SLOT(setValue(int)));
+    //----------------------------------------------------------------------------------
+    openSettings();
+}
+
+Widget::~Widget()//реализация деструктора
+{
+//закрытие устройст - ком портов например, удаление окна из памяти
+    //деструктор необязательно может быть
+    //потому что уборка мусора здесь автоматическая
+}
+//---------------------------------------------
+
+//при клике на кнопку вызывать этот слот и получать URL
+//проверять начинается ли адресс с http
+void Widget::goURL(){
+    QString addr = adresstr->text();
+    if (!(addr.startsWith("http://")||addr.startsWith("https://"))){
+        addr="http://"+addr;
+    }
+     qDebug() << addr;
+       webView->load(QUrl(addr));
+}
+//---------------------------------------------
+
+//меняем доступность кнопок при загрузке страницы
+void Widget::pageLoadStarted (){
+    stopbutton3->setEnabled(true);
+    refreshbutton4->setEnabled(true);
+}
+
+void Widget::pageLoadFinished (){
+    stopbutton3->setEnabled(false);
+}
+//---------------------------------------------
+
+void Widget::changePageScale(int value)
+{
+    qDebug() << (qreal)(value)/100.0;
+    webView->setZoomFactor((qreal)((value)/100.0));
+    //QString str = QString::number( value );
+    //qDebug() << "zoom:"+str+"%;";
+    //setStyleSheet("size: "+str+"%;");
+    //setStyleSheet("background-img:red;");
+
+}
+//-----------------------------------------------
+
+void Widget:: pageLinkClicked(QUrl addr){
+    webView->load(QUrl (addr));
+
+}
+//----------------------------------------------
+
+void Widget::mySlot(){
+    label1->setText(tr("hello world"));
+}
+//---------------------------------------------
+
+void Widget::pageTitleChanged(QString title){
+    QString titleOut = tr("My brauser");
+    if(title.length()>0){
+        titleOut +=" :: "+title;
+    }
+    setWindowTitle(titleOut);
+}
+//---------------------------------------------
+
+void Widget::pageUrlChanged (QUrl url){
+    adresstr->setText(url.toString());
+    //разблакируем наши кнопки
+    prevbutton1->setEnabled(webView->history()->canGoBack());
+    nextbutton2->setEnabled(webView->history()->canGoForward());
+}
+//---------------------------------------------
+
+void Widget::PrevButtonclicked (){
+    webView->back();
+}
+void Widget::NextButtonclicked (){
+    webView->forward();
+}
+void Widget::RefreshButtonclicked (){
+    qDebug() << "refresh";//видно только в отладке в релиазе это исчезнет
+    webView->reload();
+}
+void Widget::StopButtonclicked (){
+    webView->stop();
+}
+void Widget::closeClicked (){
+    close();
+}
+//--------------------------------------
+
+void Widget::settingsClicked (){
+    MyDialog *settingsDialog = new MyDialog(settings,this);
+    settingsDialog->show();
+    connect(settingsDialog,SIGNAL(proxyChanged()),this,SLOT(loadSettings()));
+}
+
+void Widget::historyClicked()
+{
+    HistorDialog *historydialog = new HistorDialog(this);
+    historydialog->show();
+}
+//--------------------------------------
+
+void Widget::openSettings (){
+    QString settingsPath = "./";
+#ifdef Q_OS_WIN32
+    wchar_t commonAppDataPath[MAX_PATH];
+    if (SHGetSpecialFolderPath(0, commonAppDataPath, CSIDL_COMMON_APPDATA, FALSE)) {
+       settingsPath = QString::fromWCharArray(commonAppDataPath)+QDir::separator()+
+               "MyBrowserISTU2017"+QDir::separator();
+       if (!QDir(settingsPath).exists()) {
+           QDir(QString::fromWCharArray(commonAppDataPath)).mkpath(settingsPath);
+           }
+       }
+#endif
+
+     settings = new QSettings(settingsPath+"settings.ini",QSettings::IniFormat,this);
+     loadSettings();
+
+     
+}
+
+
+void Widget::loadSettings(){
+    if (settings->value("proxy/useProxy").toBool()){
+        //Настройка прокси
+        webView->page()->networkAccessManager()->
+                setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,
+                     settings->value("proxy/host").toString(),
+                     settings->value("proxy/port").toInt(),
+                     settings->value("proxy/user").toString(),
+                     settings->value("proxy/password").toString()
+                     )
+                );
+
+    }
+    else{
+        //Настройка прокси
+         webView->page()->networkAccessManager()->setProxy(QNetworkProxy(QNetworkProxy::NoProxy));
+
+    }
+
+}
